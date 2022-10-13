@@ -1,11 +1,17 @@
 library(tidyverse)
 plays <- read.csv("plays.csv")
 pff <- read.csv("pffScoutingData.csv")
-plays$pff_passCoverage <- as.factor(plays$pff_passCoverage)
-levels(plays$pff_passCoverage)
-table(plays$pff_passCoverage)
-play_subset_list<- plays %>% 
-  group_by(pff_passCoverage) %>%
-  summarise(n = n()) %>% filter(n >100) %>% select(pff_passCoverage)
-play_subset <- plays[plays$pff_passCoverage %in% play_subset_list$pff_passCoverage,]
-plays_and_pff <- merge(play_subset, pff, on = "playId")
+week1 <- read.csv("week1.csv")
+week2 <- read.csv("week2.csv")
+week3 <- read.csv("week3.csv")
+week4 <- read.csv("week4.csv")
+week5 <- read.csv("week5.csv")
+week6 <- read.csv("week6.csv")
+week7 <- read.csv("week7.csv")
+week8 <- read.csv("week8.csv")
+tracking <- rbind(week1,week2,week3,week4,week5,week6,week7,week8)
+rm(week1,week2,week3,week4,week5,week6,week7,week8)
+#merge tracking and pff to attach roles to tracking
+tracking_pff <- merge(tracking, pff, how = "left",on = c(gameId, playId, nflId))
+tracking_just_line_players <- tracking_pff %>% 
+  filter(pff_role == "Pass Rush" | pff_role == "Pass Block" | pff_role == "Pass")
