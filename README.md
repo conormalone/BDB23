@@ -4,7 +4,8 @@ Finding the best Communicating O-Lines
 get in play probability of a sack/pressure, find the best teams at reducing that in play
 
 to do:
-get all pass rushers, passer and blockers for all plays
+DONE get all pass rushers, passer and blockers for all plays
+DONE get same for ball in play frames
 divide plays into test-train 75:25
 take random sample of frames within each play
 prepare graph where distance is edge, qb, OL, DL are node-types, binary pressure is graph feat
