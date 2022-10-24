@@ -9,6 +9,9 @@ DONE get same for ball in play frames
 divide plays into test-train 75:25
 take random sample of frames within each play
 prepare graph where distance is edge, qb, OL, DL are node-types, binary pressure is graph feat
+second model glm or random forest
+features: all player dist to qb, rusher to blocker, time
+
 train
 
 
