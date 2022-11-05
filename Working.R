@@ -112,6 +112,7 @@ test_data <- just_action_tracking %>% filter(comb_id %in% levels(just_action_tra
 graph_processing_function <- function(data){
   features <- list()
   adj_matrix <- list()
+  y_list <-list()
   for(j in 1:length(levels(data$gameId))){
     dataframe <- data %>% filter(gameId == levels(data$gameId)[j])
     dataframe <- dataframe %>% unite("comb_and_frame", c(comb_id,frameId), sep= " ",remove = FALSE) %>% 
@@ -134,7 +135,7 @@ graph_processing_function <- function(data){
       group_by(comb_and_frame) %>% 
       mutate(node_type = pff_role, row = rank(linelength, ties.method= "random"))%>% 
       #filter(comb_and_frame %in% packed_frames_list) %>% 
-      dplyr::select(comb_and_frame, node_type, frameId,s, x, y, row)
+      dplyr::select(comb_and_frame, node_type, frameId,s, x, y, row, quarter, down,yardsToGo)
     to_loop$comb_and_frame <- as.factor(to_loop$comb_and_frame)
     to_loop$node_type <- as.factor(to_loop$node_type)
     library(mltools)
@@ -145,14 +146,14 @@ graph_processing_function <- function(data){
     
     #get y values
     
-    
+    group_by_pressure <- df %>% select(c(pff_hit,pff_hurry,pff_sack)) %>% mutate_all(~replace(., is.na(.), 0)) %>% summarise(pressures = max(pff_hit,pff_hurry,pff_sack))
     
     
     #get node features(graph.x)
     #get for every play (2 node features)
-    training_features_list_by <- by(to_loop, to_loop$comb_and_frame, function(x) dplyr::select(x,c("s","node_type_Pass","node_type_Pass Block","node_type_Pass Rush")))
+    training_features_list_by <- by(to_loop, to_loop$comb_and_frame, function(x) dplyr::select(x,c("s","node_type_Pass","node_type_Pass Block","node_type_Pass Rush","frameId", "quarter", "down","yardsToGo")))
     training_features_list <- list()
-    for(i in 1:nrow(froot_loop)){
+    for(i in 1:length(levels(to_loop$comb_and_frame))){
       training_features_list[[i]] <-training_features_list_by[[i]]
     }  
     #loop to get distances between all points (adjacency matrix) (graph.a)
@@ -166,16 +167,18 @@ graph_processing_function <- function(data){
     }
     features <- append(features, training_features_list)
     adj_matrix <- append(adj_matrix, train_matrix)}
+    y_list <- append(y_list, group_by_pressure$pressures[1])
   
   
-  
-  function_graph_list <-list( train_x = features, train_a = adj_matrix)
+  function_graph_list <-list( train_x = features, train_a = adj_matrix, y = y_list)
   
   return(function_graph_list)
 } 
-training_data <- function_graph_list(train_data)
-validation_data <- function_graph_list(val_data)
-training_data <- function_graph_list(test_data)
+training_data <- graph_processing_function(train_data)
+validation_data <- graph_processing_function(val_data)
+testing_data <- graph_processing_function(test_data)
+all_data <- graph_processing_function(just_action_tracking)
 library(reticulate)
-
+source_python("GNN_Functions.py")
+all_predictions <- py$predictions
 #write.csv(predictions_test, "predictions_test.csv")
