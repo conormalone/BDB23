@@ -8,7 +8,8 @@ from tensorflow.keras.models import Model
 from spektral.data import Dataset, BatchLoader, Graph, DisjointLoader
 from spektral.transforms.normalize_adj import NormalizeAdj
 from tensorflow.keras.layers import Dropout
-from spektral.layers import GCNConv, GlobalSumPool
+from tensorflow.keras.regularizers import l1
+from spektral.layers import GCNConv, GCSConv, GlobalSumPool, GlobalAvgPool, ECCConv, GraphMasking
 
 ################################################################################
 # Config
@@ -17,6 +18,8 @@ learning_rate = 1e-3  # Learning rate
 epochs = 100  # Number of training epochs
 es_patience = 10  # Patience for early stopping
 batch_size = 21  # Batch size
+l1_reg = 5e-3
+n_out = 1
 #local_all = r.all_data
 local_test = r.testing_data
 local_train = r.training_data
@@ -47,7 +50,7 @@ class GraphDataset(Dataset):
             a = np.array(iter_a).reshape(the_length,the_length)
             #
             y = int(self.df["y"][i])
-            print(self.df["y"][i])
+            
            
             output.append(Graph(x=x, a=a, y=y))
         return(output)
@@ -66,10 +69,10 @@ data_te = GraphDataset(n_samples = len_test, df=local_test, transforms=Normalize
 data_all = GraphDataset(n_samples = len_all, df=local_all, transforms=NormalizeAdj())
 
 # Data loaders
-loader_tr = BatchLoader(data_tr, batch_size=batch_size, epochs=epochs)
-loader_va = BatchLoader(data_va, batch_size=batch_size)
-loader_te = BatchLoader(data_te, batch_size=batch_size)
-loader_all = BatchLoader(data_all, batch_size=batch_size)
+loader_tr = BatchLoader(data_tr, batch_size=batch_size, epochs=epochs, mask=True)
+loader_va = BatchLoader(data_va, batch_size=batch_size, mask=True)
+loader_te = BatchLoader(data_te, batch_size=batch_size, mask=True)
+loader_all = BatchLoader(data_all, batch_size=batch_size, mask=True)
 
 
 ################################################################################
@@ -77,23 +80,27 @@ loader_all = BatchLoader(data_all, batch_size=batch_size)
 ################################################################################
 class BDB22GNN(Model):
 
-    def __init__(self, n_hidden, n_labels):
-        super().__init__()
-        self.graph_conv = GCNConv(n_hidden)
-        self.pool = GlobalSumPool()
-        self.dropout = Dropout(0.5)
-        self.dense = Dense(n_labels, 'sigmoid')
+     def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.conv1 = GCNConv(128, activation="relu", kernel_regularizer=l1(l1_reg))
+        self.conv2 = GCSConv(64, activation="relu", kernel_regularizer=l1(l1_reg))
+        self.flatten = GlobalSumPool()
+        self.fc1 = Dense(32, activation="relu")
+        self.fc2 = Dense(1, activation="sigmoid")  
 
-    def call(self, inputs):
-        out = self.graph_conv(inputs)
-        out = self.dropout(out)
-        out = self.pool(out)
-        out = self.dense(out)
+     def call(self, inputs):
+        x, a = inputs
+        x = self.conv1([x, a])
+        x = self.conv2([x, a])
+        output = self.flatten(x)
+        output = self.fc1(output)
+        output = self.fc2(output)
+        return output
 
-        return out
+    
 
 
-model = BDB22GNN(200, 1)
+model = BDB22GNN()
 model.compile('adam', "binary_crossentropy","binary_accuracy")
 
 model.fit(loader_tr.load(), validation_data= loader_va.load(), steps_per_epoch=loader_tr.steps_per_epoch,
