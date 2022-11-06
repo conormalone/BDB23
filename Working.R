@@ -53,24 +53,26 @@ df_in_play <- df_in_play[rowSums(is.na(df_in_play))<1,]
 df_in_play$comb_id <-droplevels(df_in_play$comb_id)
 #add sampled plays 
 df_in_play <- df_in_play %>% rowwise() %>% mutate(sample_frame1 = sample(snapped:play_over,1), sample_frame2 = sample(snapped:play_over,1),
-                                      sample_frame3 = sample(snapped:play_over,1),sample_frame4 = sample(snapped:play_over,1),
-                                      sample_frame5 = sample(snapped:play_over,1),
-                                      )%>% ungroup()
+                                                  sample_frame3 = sample(snapped:play_over,1),sample_frame4 = sample(snapped:play_over,1),
+                                                  sample_frame5 = sample(snapped:play_over,1),
+)%>% ungroup()
 
 
 just_action_tracking<- data.frame()
 result <- data.frame()
 #subset tracking to just frames between snap and pass/sack
 for(i in 1:length(levels(df_in_play$comb_id))){
-    df_in_play_just_combid <- df_in_play[df_in_play$comb_id == levels(df_in_play$comb_id)[i],] 
-    result <- tracking_pff %>% 
-      filter(comb_id == levels(df_in_play$comb_id)[i] & frameId >= df_in_play_just_combid$snapped[1] & frameId <= df_in_play_just_combid$play_over[1])
-    just_action_tracking <- rbind(just_action_tracking, result)
+  df_in_play_just_combid <- df_in_play[df_in_play$comb_id == levels(df_in_play$comb_id)[i],] 
+  result <- tracking_pff %>% 
+    filter(comb_id == levels(df_in_play$comb_id)[i] & frameId >= df_in_play_just_combid$snapped[1] & frameId <= df_in_play_just_combid$play_over[1])
+  just_action_tracking <- rbind(just_action_tracking, result)
 }
 just_action_tracking$pff_role <- as.factor(just_action_tracking$pff_role)
 just_action_tracking <- just_action_tracking %>% filter(pff_role == "Pass Rush" | pff_role == "Pass Block" | pff_role == "Pass")
 just_action_tracking$comb_id <- droplevels(just_action_tracking$comb_id)
-
+just_action_tracking <- just_action_tracking %>% unite("comb_and_frame", c(comb_id,frameId), sep= " ",remove = FALSE) %>% 
+  mutate(comb_and_frame = as.factor(comb_and_frame))
+just_action_tracking$comb_and_frame <- as.factor(just_action_tracking$comb_and_frame)
 #test train split
 N<-length(levels(just_action_tracking$comb_id))
 trainset<-sort(sample(1:N,size=floor(N*0.80)))
@@ -85,23 +87,23 @@ rm(df_start_end)
 #just_action_trackingv2 <- just_action_tracking %>% dplyr::select(gameId, playId, comb_id, pff_role, frameId,s, x, y,x_std,y_std)
 #separating test/train data
 train_val_subset_function <- function(subset){
-frames <- just_action_tracking %>% filter(comb_id %in% levels(just_action_tracking$comb_id)[subset])
-chosen_frames <- data.frame(matrix(, ncol = ncol(frames)))
-names(chosen_frames) <- names(frames)
-for(i in 1:length(subset)){
-  df_in_play_down <- df_in_play %>% filter(comb_id == levels(just_action_tracking$comb_id)[subset[i]])
-  frames_down <- frames %>% filter(comb_id == levels(just_action_tracking$comb_id)[subset[i]])
-  set_1 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame1[1])
-  set_2 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame2[1])
-  set_3 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame3[1])
-  set_4 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame4[1])
-  set_5 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame5[1])
-  chosen_frames <- rbind(chosen_frames, set_1,set_2,set_3,set_4,set_5)
-}
-chosen_frames$gameId <- as.factor(chosen_frames$gameId)
-chosen_frames$playId <- as.factor(chosen_frames$playId)
-chosen_frames$pff_role <- as.factor(chosen_frames$pff_role)
-return(chosen_frames)
+  frames <- just_action_tracking %>% filter(comb_id %in% levels(just_action_tracking$comb_id)[subset])
+  chosen_frames <- data.frame(matrix(, ncol = ncol(frames)))
+  names(chosen_frames) <- names(frames)
+  for(i in 1:length(subset)){
+    df_in_play_down <- df_in_play %>% filter(comb_id == levels(just_action_tracking$comb_id)[subset[i]])
+    frames_down <- frames %>% filter(comb_id == levels(just_action_tracking$comb_id)[subset[i]])
+    set_1 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame1[1])
+    set_2 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame2[1])
+    set_3 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame3[1])
+    set_4 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame4[1])
+    set_5 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame5[1])
+    chosen_frames <- rbind(chosen_frames, set_1,set_2,set_3,set_4,set_5)
+  }
+  chosen_frames$gameId <- as.factor(chosen_frames$gameId)
+  chosen_frames$playId <- as.factor(chosen_frames$playId)
+  chosen_frames$pff_role <- as.factor(chosen_frames$pff_role)
+  return(chosen_frames)
 }
 val_data <- train_val_subset_function(validset)
 train_data <- train_val_subset_function(trainset)
@@ -109,14 +111,18 @@ test_data <- just_action_tracking %>% filter(comb_id %in% levels(just_action_tra
 ##############
 ####graph function from 2022
 ####graph function from 2022
+library(mltools)
+library(data.table)
 graph_processing_function <- function(data){
   features <- list()
   adj_matrix <- list()
   y_list <-list()
-  for(j in 1:length(levels(data$gameId))){
-    dataframe <- data %>% filter(gameId == levels(data$gameId)[j])
-    dataframe <- dataframe %>% unite("comb_and_frame", c(comb_id,frameId), sep= " ",remove = FALSE) %>% 
-      mutate(comb_and_frame = as.factor(comb_and_frame)) %>%  distinct
+  data$comb_and_frame <- as.factor(data$comb_and_frame)
+  for(j in 1:length(levels(data$comb_and_frame))){
+    
+    dataframe <- data %>% filter(comb_and_frame == levels(data$comb_and_frame)[j])
+    #dataframe <- dataframe %>% unite("comb_and_frame", c(comb_id,frameId), sep= " ",remove = FALSE) %>% 
+    # mutate(comb_and_frame = as.factor(comb_and_frame)) %>%  distinct
     #get ball location for each play
     ball_location <-dataframe %>% filter(pff_role == "Pass") %>% dplyr::select(c(comb_and_frame, x_std, y_std)) %>%  distinct
     #join ball location
@@ -138,11 +144,10 @@ graph_processing_function <- function(data){
       dplyr::select(comb_and_frame, node_type, frameId,s, x, y, row, quarter, down,yardsToGo)
     to_loop$comb_and_frame <- as.factor(to_loop$comb_and_frame)
     to_loop$node_type <- as.factor(to_loop$node_type)
-    library(mltools)
-    library(data.table)
+    
     to_loop <-one_hot(data.table(to_loop),cols = c("node_type"))
     
-    rm(df)  
+     
     
     #get y values
     
@@ -163,11 +168,11 @@ graph_processing_function <- function(data){
       dist_subset <- to_loop %>% select(-row) %>% filter(comb_and_frame == levels(to_loop$comb_and_frame)[i]) %>% 
         distinct %>% 
         select(c(x,y))
-      train_matrix[[i]] <- dist(dist_subset,method= "euclidean",diag=T, upper=T)
+      train_matrix[[i]] <- as.matrix(dist(dist_subset,method= "euclidean",diag=T, upper=T))
     }
     features <- append(features, training_features_list)
     adj_matrix <- append(adj_matrix, train_matrix)}
-    y_list <- append(y_list, group_by_pressure$pressures[1])
+  y_list <- append(y_list, group_by_pressure$pressures[1])
   
   
   function_graph_list <-list( train_x = features, train_a = adj_matrix, y = y_list)
