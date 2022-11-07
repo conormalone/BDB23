@@ -156,24 +156,18 @@ graph_processing_function <- function(data){
     
     #get node features(graph.x)
     #get for every play (2 node features)
-    training_features_list_by <- by(to_loop, to_loop$comb_and_frame, function(x) dplyr::select(x,c("s","node_type_Pass","node_type_Pass Block","node_type_Pass Rush","frameId", "quarter", "down","yardsToGo")))
-    training_features_list <- list()
-    for(i in 1:length(levels(to_loop$comb_and_frame))){
-      training_features_list[[i]] <-training_features_list_by[[i]]
-    }  
+    training_features_list <- to_loop %>%  dplyr::select(x,c("s","node_type_Pass","node_type_Pass Block","node_type_Pass Rush","frameId", "quarter", "down","yardsToGo"))
+    
     #loop to get distances between all points (adjacency matrix) (graph.a)
-    train_matrix<-list()
-    for(i in 1:length(levels(to_loop$comb_and_frame))){
-      train_matrix[[i]] <-list()
       dist_subset <- to_loop %>% select(-row) %>% filter(comb_and_frame == levels(to_loop$comb_and_frame)[i]) %>% 
         distinct %>% 
         select(c(x,y))
-      train_matrix[[i]] <- as.matrix(dist(dist_subset,method= "euclidean",diag=T, upper=T))
-    }
+      train_matrix <- as.matrix(dist(dist_subset,method= "euclidean",diag=T, upper=T))
+    
     features <- append(features, training_features_list)
-    adj_matrix <- append(adj_matrix, train_matrix)}
+    adj_matrix <- append(adj_matrix, train_matrix)
   y_list <- append(y_list, group_by_pressure$pressures[1])
-  
+  }
   
   function_graph_list <-list( train_x = features, train_a = adj_matrix, y = y_list)
   
