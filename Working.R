@@ -118,8 +118,8 @@ graph_processing_function <- function(data){
   adj_matrix <- list()
   y_list <-list()
   data$comb_and_frame <- as.factor(data$comb_and_frame)
-  for(j in 1:length(levels(data$comb_and_frame))){
-    
+  for(j in 1:(length(levels(data$comb_and_frame))-1)){
+    data$comb_and_frame <- droplevels(data$comb_and_frame)
     dataframe <- data %>% filter(comb_and_frame == levels(data$comb_and_frame)[j])
     #dataframe <- dataframe %>% unite("comb_and_frame", c(comb_id,frameId), sep= " ",remove = FALSE) %>% 
     # mutate(comb_and_frame = as.factor(comb_and_frame)) %>%  distinct
@@ -156,17 +156,17 @@ graph_processing_function <- function(data){
     
     #get node features(graph.x)
     #get for every play (2 node features)
-    training_features_list <- to_loop %>%  dplyr::select(x,c("s","node_type_Pass","node_type_Pass Block","node_type_Pass Rush","frameId", "quarter", "down","yardsToGo"))
+    features[[j]] <- to_loop %>%  dplyr::select(x,c("s","node_type_Pass","node_type_Pass Block","node_type_Pass Rush","frameId", "quarter", "down","yardsToGo"))
     
     #loop to get distances between all points (adjacency matrix) (graph.a)
-      dist_subset <- to_loop %>% select(-row) %>% filter(comb_and_frame == levels(to_loop$comb_and_frame)[i]) %>% 
+      dist_subset <- to_loop %>% select(-row) %>% 
         distinct %>% 
         select(c(x,y))
-      train_matrix <- as.matrix(dist(dist_subset,method= "euclidean",diag=T, upper=T))
+      adj_matrix[[j]] <- as.matrix(dist(dist_subset,method= "euclidean",diag=T, upper=T))
     
-    features <- append(features, training_features_list)
-    adj_matrix <- append(adj_matrix, train_matrix)
-  y_list <- append(y_list, group_by_pressure$pressures[1])
+    #features <- c(features, training_features_list)
+    #adj_matrix <- c(adj_matrix, train_matrix)
+  y_list <- c(y_list, group_by_pressure$pressures[1])
   }
   
   function_graph_list <-list( train_x = features, train_a = adj_matrix, y = y_list)
@@ -177,6 +177,13 @@ training_data <- graph_processing_function(train_data)
 validation_data <- graph_processing_function(val_data)
 testing_data <- graph_processing_function(test_data)
 all_data <- graph_processing_function(just_action_tracking)
+
+#test <-list( y = all_data$y[testset], train_x = all_data$train_x[testset], train_a = all_data$train_a[testset])
+#train <-list( y = all_data$y[trainset], train_x = all_data$train_x[trainset], train_a = all_data$train_a[trainset])
+#validate <-list(y = all_data$y[validset], train_x = all_data$train_x[validset], train_a = all_data$train_a[validset])
+
+
+
 library(reticulate)
 source_python("GNN_Functions.py")
 all_predictions <- py$predictions
