@@ -47,7 +47,7 @@ class GraphDataset(Dataset):
             a = np.array(iter_a).reshape(the_length,the_length)
             #
             y = int(self.df["y"][i])
-            print(self.df["y"][i])
+            
            
             output.append(Graph(x=x, a=a, y=y))
         return(output)
@@ -99,8 +99,8 @@ model.compile('adam', "binary_crossentropy","binary_accuracy")
 model.fit(loader_tr.load(), validation_data= loader_va.load(), steps_per_epoch=loader_tr.steps_per_epoch,
     validation_steps=loader_va.steps_per_epoch, epochs=100)
 
-test_loss = model.evaluate(loader_te.load(), steps=loader_te.steps_per_epoch)
+#test_loss = model.evaluate(loader_te.load(), steps=loader_te.steps_per_epoch)
 
-print('Test loss: {}'.format(test_loss))
+#print('Test loss: {}'.format(test_loss))
 
 predictions = model.predict(loader_all.load(), steps =loader_all.steps_per_epoch)

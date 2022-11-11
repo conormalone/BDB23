@@ -187,4 +187,10 @@ all_data <- graph_processing_function(just_action_tracking)
 library(reticulate)
 source_python("GNN_Functions.py")
 all_predictions <- py$predictions
-#write.csv(predictions_test, "predictions_test.csv")
+#leave out last level, it took 2 days to run, not doing it again
+just_action_tracking <- just_action_tracking %>% filter(comb_and_frame != "2021110100 917 9")
+just_action_tracking$comb_and_frame <- droplevels(just_action_tracking$comb_and_frame)
+length(levels(just_action_tracking$comb_and_frame))
+merged_predictions <- cbind(levels(just_action_tracking$comb_and_frame),as.numeric(all_predictions))
+colnames(merged_predictions) <- c("comb_and_frame","predictions")
+new_df <- merge(just_action_tracking,merged_predictions, on= "comb_and_frame")
