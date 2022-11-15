@@ -72,8 +72,17 @@ just_action_tracking <- just_action_tracking %>% filter(pff_role == "Pass Rush" 
 just_action_tracking$comb_id <- droplevels(just_action_tracking$comb_id)
 just_action_tracking <- just_action_tracking %>% unite("comb_and_frame", c(comb_id,frameId), sep= " ",remove = FALSE) %>% 
   mutate(comb_and_frame = as.factor(comb_and_frame))
+just_action_tracking <- just_action_tracking %>% filter(!is.na(comb_and_frame))
 just_action_tracking$comb_and_frame <- as.factor(just_action_tracking$comb_and_frame)
-#test train split
+
+
+
+
+#train val split and 1 0 split
+just_sack_frame <- just_action_tracking %>% filter(event == "qb_sack"|event == "qb_strip_sack") %>% select(c(comb_id,frameId)) %>% distinct
+just_action_zero <- just_action_tracking %>% filter(!(comb_id %in% just_sack_frame$comb_id))
+just_action_one <- just_action_tracking %>% filter(comb_id %in% just_sack_frame$comb_id)
+
 N<-length(levels(just_action_tracking$comb_id))
 trainset<-sort(sample(1:N,size=floor(N*0.80)))
 
@@ -84,8 +93,8 @@ rm(tracking_just_line_players)
 rm(tracking_pff)
 rm(tracking_clean)
 rm(df_start_end)
-#just_action_trackingv2 <- just_action_tracking %>% dplyr::select(gameId, playId, comb_id, pff_role, frameId,s, x, y,x_std,y_std)
-#separating test/train data
+
+#separating test/val data (no sack)
 train_val_subset_function <- function(subset){
   frames <- just_action_tracking %>% filter(comb_id %in% levels(just_action_tracking$comb_id)[subset])
   chosen_frames <- data.frame(matrix(, ncol = ncol(frames)))
@@ -94,11 +103,11 @@ train_val_subset_function <- function(subset){
     df_in_play_down <- df_in_play %>% filter(comb_id == levels(just_action_tracking$comb_id)[subset[i]])
     frames_down <- frames %>% filter(comb_id == levels(just_action_tracking$comb_id)[subset[i]])
     set_1 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame1[1])
-    set_2 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame2[1])
-    set_3 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame3[1])
-    set_4 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame4[1])
-    set_5 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame5[1])
-    chosen_frames <- rbind(chosen_frames, set_1,set_2,set_3,set_4,set_5)
+    #set_2 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame2[1])
+    #set_3 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame3[1])
+    #set_4 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame4[1])
+    #set_5 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame5[1])
+    chosen_frames <- rbind(chosen_frames, set_1)#,set_2,set_3,set_4,set_5)
   }
   chosen_frames$gameId <- as.factor(chosen_frames$gameId)
   chosen_frames$playId <- as.factor(chosen_frames$playId)
@@ -107,7 +116,7 @@ train_val_subset_function <- function(subset){
 }
 val_data <- train_val_subset_function(validset)
 train_data <- train_val_subset_function(trainset)
-test_data <- just_action_tracking %>% filter(comb_id %in% levels(just_action_tracking$comb_id)[testset])
+#test_data <- just_action_tracking %>% filter(comb_id %in% levels(just_action_tracking$comb_id)[testset])
 ##############
 ####graph function from 2022
 ####graph function from 2022
@@ -118,7 +127,7 @@ graph_processing_function <- function(data){
   adj_matrix <- list()
   y_list <-list()
   data$comb_and_frame <- as.factor(data$comb_and_frame)
-  for(j in 1:(length(levels(data$comb_and_frame))-1)){
+  for(j in 1:length(levels(data$comb_and_frame))){
     data$comb_and_frame <- droplevels(data$comb_and_frame)
     dataframe <- data %>% filter(comb_and_frame == levels(data$comb_and_frame)[j])
     #dataframe <- dataframe %>% unite("comb_and_frame", c(comb_id,frameId), sep= " ",remove = FALSE) %>% 
@@ -140,7 +149,7 @@ graph_processing_function <- function(data){
     to_loop <- df %>% 
       group_by(comb_and_frame) %>% 
       mutate(node_type = pff_role, row = rank(linelength, ties.method= "random"))%>% 
-      #filter(comb_and_frame %in% packed_frames_list) %>% 
+      arrange(row) %>% 
       dplyr::select(comb_and_frame, node_type, frameId,s, x, y, row, quarter, down,yardsToGo)
     to_loop$comb_and_frame <- as.factor(to_loop$comb_and_frame)
     to_loop$node_type <- as.factor(to_loop$node_type)
@@ -156,7 +165,7 @@ graph_processing_function <- function(data){
     
     #get node features(graph.x)
     #get for every play (2 node features)
-    features[[j]] <- to_loop %>%  dplyr::select(x,c("s","node_type_Pass","node_type_Pass Block","node_type_Pass Rush","frameId", "quarter", "down","yardsToGo"))
+    features[[j]] <- to_loop %>%  dplyr::select(x,c("s","node_type_Pass","node_type_Pass Block","node_type_Pass Rush","frameId", "quarter", "down","yardsToGo", "row"))
     
     #loop to get distances between all points (adjacency matrix) (graph.a)
       dist_subset <- to_loop %>% select(-row) %>% 
@@ -175,7 +184,7 @@ graph_processing_function <- function(data){
 } 
 training_data <- graph_processing_function(train_data)
 validation_data <- graph_processing_function(val_data)
-testing_data <- graph_processing_function(test_data)
+#testing_data <- graph_processing_function(test_data)
 all_data <- graph_processing_function(just_action_tracking)
 
 #test <-list( y = all_data$y[testset], train_x = all_data$train_x[testset], train_a = all_data$train_a[testset])
@@ -187,10 +196,30 @@ all_data <- graph_processing_function(just_action_tracking)
 library(reticulate)
 source_python("GNN_Functions.py")
 all_predictions <- py$predictions
+
 #leave out last level, it took 2 days to run, not doing it again
 just_action_tracking <- just_action_tracking %>% filter(comb_and_frame != "2021110100 917 9")
 just_action_tracking$comb_and_frame <- droplevels(just_action_tracking$comb_and_frame)
+#
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 length(levels(just_action_tracking$comb_and_frame))
 merged_predictions <- cbind(levels(just_action_tracking$comb_and_frame),as.numeric(all_predictions))
 colnames(merged_predictions) <- c("comb_and_frame","predictions")
 new_df <- merge(just_action_tracking,merged_predictions, on= "comb_and_frame")
+new_df$predictions <-as.numeric(new_df$predictions)
+level_chk <-new_df %>% group_by(comb_id) %>% select(c("comb_id","predictions")) %>% 
+  summarise(max_rate= max(predictions), min_rate = min(predictions), diff = max_rate-min_rate) %>% 
+  arrange(desc(diff))
