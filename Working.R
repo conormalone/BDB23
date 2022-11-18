@@ -80,22 +80,29 @@ just_action_tracking$comb_and_frame <- as.factor(just_action_tracking$comb_and_f
 
 #train val split and 1 0 split
 just_sack_frame <- just_action_tracking %>% filter(event == "qb_sack"|event == "qb_strip_sack") %>% select(c(comb_id,frameId)) %>% distinct
+no_sack_frame <- levels(just_action_tracking$comb_id)[!(levels(just_action_tracking$comb_id) %in% just_sack_frame$comb_id)]
 just_action_zero <- just_action_tracking %>% filter(!(comb_id %in% just_sack_frame$comb_id))
 just_action_one <- just_action_tracking %>% filter(comb_id %in% just_sack_frame$comb_id)
 
-N<-length(levels(just_action_tracking$comb_id))
-trainset<-sort(sample(1:N,size=floor(N*0.80)))
+#subset no sacks
+N_0<-length(no_sack_frame)
+trainset_0<-sort(sample(1:N_0,size=floor(N_0*0.80)))
+validset_0<-setdiff(1:N_0,trainset)
+#validset<-sort(sample(nottestset,size=length(nottestset)/2))
+#testset<-sort(setdiff(nottestset,validset))
+#subset sack plays
+N_1<-length(just_sack_frame$comb_id)
+trainset_1<-sort(sample(1:N_1,size=floor(N_1*0.80)))
+validset_1<-setdiff(1:N_1,trainset)
 
-nottestset<-setdiff(1:N,trainset)
-validset<-sort(sample(nottestset,size=length(nottestset)/2))
-testset<-sort(setdiff(nottestset,validset))
+
 rm(tracking_just_line_players)
 rm(tracking_pff)
 rm(tracking_clean)
 rm(df_start_end)
 
 #separating test/val data (no sack)
-train_val_subset_function <- function(subset){
+train_val_subset_function__0 <- function(subset){
   frames <- just_action_tracking %>% filter(comb_id %in% levels(just_action_tracking$comb_id)[subset])
   chosen_frames <- data.frame(matrix(, ncol = ncol(frames)))
   names(chosen_frames) <- names(frames)
@@ -103,6 +110,30 @@ train_val_subset_function <- function(subset){
     df_in_play_down <- df_in_play %>% filter(comb_id == levels(just_action_tracking$comb_id)[subset[i]])
     frames_down <- frames %>% filter(comb_id == levels(just_action_tracking$comb_id)[subset[i]])
     set_1 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame1[1])
+    set_2 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame2[1])
+    #set_3 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame3[1])
+    #set_4 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame4[1])
+    #set_5 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame5[1])
+    chosen_frames <- rbind(chosen_frames, set_1,set_2)#,set_2,set_3,set_4,set_5)
+  }
+  chosen_frames$gameId <- as.factor(chosen_frames$gameId)
+  chosen_frames$playId <- as.factor(chosen_frames$playId)
+  chosen_frames$pff_role <- as.factor(chosen_frames$pff_role)
+  return(chosen_frames)
+}
+val_data_0 <- train_val_subset_function_0(validset_0)
+train_data_0  <- train_val_subset_function_0(trainset_0)
+#test_data <- just_action_tracking %>% filter(comb_id %in% levels(just_action_tracking$comb_id)[testset])
+
+#subset chosen data test/val data YES SACK
+train_val_subset_function__1 <- function(subset){
+  frames <- just_action_tracking %>% filter(comb_id %in% just_sack_frame$comb_id[subset])
+  chosen_frames <- data.frame(matrix(, ncol = ncol(frames)))
+  names(chosen_frames) <- names(frames)
+  for(i in 1:length(subset)){
+    df_in_play_down <- df_in_play %>% filter(comb_id == levels(just_action_tracking$comb_id)[subset[i]])
+    frames_down <- frames %>% filter(comb_id == levels(just_action_tracking$comb_id)[subset[i]])
+    set_1 <- frames_down %>% filter(frameId >= (df_in_play_down$play_over[1]-15))
     #set_2 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame2[1])
     #set_3 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame3[1])
     #set_4 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame4[1])
@@ -114,9 +145,10 @@ train_val_subset_function <- function(subset){
   chosen_frames$pff_role <- as.factor(chosen_frames$pff_role)
   return(chosen_frames)
 }
-val_data <- train_val_subset_function(validset)
-train_data <- train_val_subset_function(trainset)
-#test_data <- just_action_tracking %>% filter(comb_id %in% levels(just_action_tracking$comb_id)[testset])
+val_data_1 <- train_val_subset_function_1(validset_1)
+train_data_1  <- train_val_subset_function_1(trainset_1)
+
+
 ##############
 ####graph function from 2022
 ####graph function from 2022
