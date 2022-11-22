@@ -102,7 +102,7 @@ rm(tracking_clean)
 rm(df_start_end)
 
 #separating test/val data (no sack)
-train_val_subset_function__0 <- function(subset){
+train_val_subset_function_0 <- function(subset){
   frames <- just_action_tracking %>% filter(comb_id %in% levels(just_action_tracking$comb_id)[subset])
   chosen_frames <- data.frame(matrix(, ncol = ncol(frames)))
   names(chosen_frames) <- names(frames)
@@ -126,13 +126,13 @@ train_data_0  <- train_val_subset_function_0(trainset_0)
 #test_data <- just_action_tracking %>% filter(comb_id %in% levels(just_action_tracking$comb_id)[testset])
 
 #subset chosen data test/val data YES SACK
-train_val_subset_function__1 <- function(subset){
+train_val_subset_function_1 <- function(subset){
   frames <- just_action_tracking %>% filter(comb_id %in% just_sack_frame$comb_id[subset])
   chosen_frames <- data.frame(matrix(, ncol = ncol(frames)))
   names(chosen_frames) <- names(frames)
   for(i in 1:length(subset)){
-    df_in_play_down <- df_in_play %>% filter(comb_id == levels(just_action_tracking$comb_id)[subset[i]])
-    frames_down <- frames %>% filter(comb_id == levels(just_action_tracking$comb_id)[subset[i]])
+    df_in_play_down <- df_in_play %>% filter(comb_id == just_sack_frame$comb_id[subset[i]])
+    frames_down <- frames %>% filter(comb_id == just_sack_frame$comb_id[subset[i]])
     set_1 <- frames_down %>% filter(frameId >= (df_in_play_down$play_over[1]-15))
     #set_2 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame2[1])
     #set_3 <- frames_down %>% filter(frameId == df_in_play_down$sample_frame3[1])
@@ -147,14 +147,18 @@ train_val_subset_function__1 <- function(subset){
 }
 val_data_1 <- train_val_subset_function_1(validset_1)
 train_data_1  <- train_val_subset_function_1(trainset_1)
+val_data <- rbind(val_data_0,val_data_1)
+train_data <- rbind(train_data_0,train_data_1)
 
-
+just_sack_frame <- just_sack_frame %>% unite("comb_and_frame", c(comb_id,frameId), sep= " ",remove = FALSE) %>% 
+  mutate(comb_and_frame = as.factor(comb_and_frame))
+just_sack_frame$comb_and_frame <- as.factor(just_sack_frame$comb_and_frame)
 ##############
 ####graph function from 2022
 ####graph function from 2022
 library(mltools)
 library(data.table)
-graph_processing_function <- function(data){
+graph_processing_function <- function(data, end = 0){
   features <- list()
   adj_matrix <- list()
   y_list <-list()
@@ -191,9 +195,14 @@ graph_processing_function <- function(data){
      
     
     #get y values
-    
-    group_by_pressure <- df %>% select(c(pff_hit,pff_hurry,pff_sack)) %>% mutate_all(~replace(., is.na(.), 0)) %>% summarise(pressures = max(pff_hit,pff_hurry,pff_sack))
-    
+    if(end ==1){
+    group_by_pressure <- ifelse(df$comb_and_frame %in% just_sack_frame$comb_and_frame,1,0)
+    #group_by_pressure <- df %>% select(c(pff_hit,pff_hurry,pff_sack)) %>% mutate_all(~replace(., is.na(.), 0)) %>% summarise(pressures = max(pff_hit,pff_hurry,pff_sack))
+    }
+    else{
+      df_this_play <- df_in_play %>% filter(comb_id == df$comb_id[1])
+      group_by_pressure <- ifelse(df$frameId >=(df_this_play$play_over[1]-15),1,0)
+    }
     
     #get node features(graph.x)
     #get for every play (2 node features)
@@ -207,22 +216,20 @@ graph_processing_function <- function(data){
     
     #features <- c(features, training_features_list)
     #adj_matrix <- c(adj_matrix, train_matrix)
-  y_list <- c(y_list, group_by_pressure$pressures[1])
+  y_list <- c(y_list, group_by_pressure[1])
   }
   
   function_graph_list <-list( train_x = features, train_a = adj_matrix, y = y_list)
   
   return(function_graph_list)
 } 
-training_data <- graph_processing_function(train_data)
-validation_data <- graph_processing_function(val_data)
-#testing_data <- graph_processing_function(test_data)
+#use function on start (all) and end data
+training_data_start <- graph_processing_function(train_data)
+validation_data_start <- graph_processing_function(val_data)
+training_data_end <- graph_processing_function(train_data)
+validation_data_end <- graph_processing_function(val_data)
+
 all_data <- graph_processing_function(just_action_tracking)
-
-#test <-list( y = all_data$y[testset], train_x = all_data$train_x[testset], train_a = all_data$train_a[testset])
-#train <-list( y = all_data$y[trainset], train_x = all_data$train_x[trainset], train_a = all_data$train_a[trainset])
-#validate <-list(y = all_data$y[validset], train_x = all_data$train_x[validset], train_a = all_data$train_a[validset])
-
 
 
 library(reticulate)
@@ -230,7 +237,7 @@ source_python("GNN_Functions.py")
 all_predictions <- py$predictions
 
 #leave out last level, it took 2 days to run, not doing it again
-just_action_tracking <- just_action_tracking %>% filter(comb_and_frame != "2021110100 917 9")
+#just_action_tracking <- just_action_tracking %>% filter(comb_and_frame != "2021110100 917 9")
 just_action_tracking$comb_and_frame <- droplevels(just_action_tracking$comb_and_frame)
 #
 
@@ -238,7 +245,7 @@ just_action_tracking$comb_and_frame <- droplevels(just_action_tracking$comb_and_
 
 
 
-
+training_data$y[100]
 
 
 

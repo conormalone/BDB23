@@ -4,7 +4,9 @@ Finding the best Communicating O-Lines
 get in play probability of a sack/pressure, find the best teams at reducing that in play
 
 to do:
-REDO Model is there a sack within 15 frames
+Model 1: y = 15 frames from end, all data
+Model 2 y = sack, data from last 15 frames of plays, all sacks & 1500 non sacks
+
 
 redo test train split
 500 sacks
