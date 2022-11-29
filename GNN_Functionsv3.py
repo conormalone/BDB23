@@ -107,6 +107,7 @@ model_start.compile('adam', "binary_crossentropy","binary_accuracy")
 model_start.fit(loader_tr_start.load(), validation_data= loader_va_start.load(), steps_per_epoch=loader_tr_start.steps_per_epoch,
     validation_steps=loader_va_start.steps_per_epoch, epochs=100)
 
+predictions_start = model_start.predict(loader_all.load(), steps =loader_all.steps_per_epoch)
 model_end = BDB22GNN(200, 1)
 model_end.compile('adam', "binary_crossentropy","binary_accuracy")
 
@@ -116,5 +117,5 @@ model_end.fit(loader_tr_end.load(), validation_data= loader_va_end.load(), steps
 
 #print('Test loss: {}'.format(test_loss))
 
-predictions_start = model_start.predict(loader_all.load(), steps =loader_all.steps_per_epoch)
+
 predictions_end = model_end.predict(loader_all.load(), steps =loader_all.steps_per_epoch)
