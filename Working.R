@@ -92,11 +92,11 @@ validset_start<-setdiff(1:N_start,trainset_start)
 #testset<-sort(setdiff(nottestset,validset))
 #subset end - sack plays
 N_end_1<-length(just_sack_frame$comb_id)
-trainset_end_1<-sort(sample(1:N_end_1,size=floor(N_end_1*0.90)))
+trainset_end_1<-sort(sample(1:N_end_1,size=floor(N_end_1*0.90*5),replace = T))
 validset_end_1<-setdiff(1:N_end_1,trainset_end_1)
 #subset end - not sacked plays
 N_end_0<-length(no_sack_frame)
-trainset_end_0<-sort(sample(1:N_end_0,size=floor(N_end_1*0.90*20),replace = T))
+trainset_end_0<-sort(sample(1:N_end_0,size=floor(N_end_1*0.90*80),replace = T))
 validset_end_0<-setdiff(1:N_end_0,trainset_end_0)
 
 
@@ -139,7 +139,7 @@ train_val_subset_function_end_1 <- function(subset){
   for(i in 1:length(subset)){
     df_in_play_down <- df_in_play %>% filter(comb_id == just_sack_frame$comb_id[subset[i]])
     frames_down <- frames %>% filter(comb_id == just_sack_frame$comb_id[subset[i]])
-    set_1 <- frames_down %>% filter(frameId >= (df_in_play_down$play_over[1]-20))
+    set_1 <- frames_down %>% filter(frameId >= (df_in_play_down$play_over[1]-15))
     chosen_frames <- rbind(chosen_frames, set_1)#,set_2,set_3,set_4,set_5)
   }
   chosen_frames$gameId <- as.factor(chosen_frames$gameId)
@@ -153,7 +153,7 @@ train_val_subset_function_end_0 <- function(subset){
   chosen_frames <- data.frame(matrix(, ncol = ncol(frames)))
   names(chosen_frames) <- names(frames)
   for(i in 1:length(subset)){
-    sample_choice <- sample(1:20,1)
+    sample_choice <- sample(1:15,1)
     df_in_play_down <- df_in_play %>% filter(comb_id == no_sack_frame[subset[i]])
     frames_down <- frames %>% filter(comb_id == no_sack_frame[subset[i]])
     set_1 <- frames_down %>% filter(frameId == (df_in_play_down$play_over[1]-sample_choice))
@@ -223,7 +223,7 @@ graph_processing_function <- function(data, end = 0){
     }
     else{
       df_this_play <- df_in_play %>% filter(comb_id == df$comb_id[1])
-      group_by_pressure <- ifelse(df$frameId >=(df_this_play$play_over[1]-20),1,0)
+      group_by_pressure <- ifelse(df$frameId >=(df_this_play$play_over[1]-15),1,0)
     }
     
     #get node features(graph.x)
@@ -262,16 +262,17 @@ end_predictions <- py$predictions_end
 mean(start_predictions)
 #leave out last level, it took 2 days to run, not doing it again
 #just_action_tracking <- just_action_tracking %>% filter(comb_and_frame != "2021110100 917 9")
-just_action_tracking$comb_and_frame <- droplevels(just_action_tracking$comb_and_frame)
+#just_action_tracking$comb_and_frame <- droplevels(just_action_tracking$comb_and_frame)
 #
 
-length(levels(just_action_tracking$comb_and_frame))
+#length(levels(just_action_tracking$comb_and_frame))
 merged_predictions <- cbind(levels(just_action_tracking$comb_and_frame),as.numeric(start_predictions),as.numeric(end_predictions))
 colnames(merged_predictions) <- c("comb_and_frame","start_predictions","end_predictions")
 new_df <- merge(just_action_tracking,merged_predictions, on= "comb_and_frame")
 new_df$end_predictions <-as.numeric(new_df$end_predictions)
 new_df$start_predictions <-as.numeric(new_df$start_predictions)
 new_df$combined_predictions <- new_df$start_predictions *new_df$end_predictions
+write.csv(new_df, "new_df15.csv")
 level_chk <-new_df %>% group_by(comb_id) %>% select(c("comb_id","combined_predictions")) %>% 
   summarise(max_rate= max(combined_predictions), min_rate = min(combined_predictions), diff = max_rate-min_rate) %>% 
   arrange(desc(diff))
