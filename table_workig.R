@@ -152,6 +152,12 @@ iteration <- cbind(keepers, Def_dist,Block_dist,y)
 result <- rbind(result, iteration)
 #return(iteration)
 }
+library(tidyverse)
+result <- read.csv("result.csv")
+result <- result %>% select(-X)
+just_sack_frame <- just_action_tracking %>% filter(event == "qb_sack"|event == "qb_strip_sack") %>% select(c(comb_id,frameId)) %>% unite("comb_and_frame", c(comb_id,frameId), sep= " ",remove = FALSE) %>% 
+  mutate(comb_and_frame = as.factor(comb_and_frame))%>% distinct
+
 y <- ifelse(result$comb_and_frame  %in% just_sack_frame$comb_and_frame,1,0)
 result$y <- y
 #make some factors and onehot them
@@ -171,9 +177,6 @@ train_data <- result %>% filter(comb_id %in% levels(just_action_tracking$comb_id
 val_data <- result %>% filter(comb_id %in% levels(just_action_tracking$comb_id)[validset])%>% select(-c(comb_and_frame,comb_id))
 #lets find a working model
 
-glm_model <- glm(formula = y ~ ., data = train_data, family = "binomial")
-summary(glm_model)
-prediction <- predict(glm_model, newdata = val_data)
 
 library(xgboost)
 train_no_y <- train_data %>% select(-y)
@@ -181,12 +184,15 @@ val_no_y <- val_data %>% select(-y)
 result_no_y <- result %>% select(-c(y, comb_and_frame,comb_id))
 bstSparse <-xgboost(data = as.matrix(train_no_y), label = train_data$y, max.depth = 10, nrounds = 10, objective = "binary:logistic", verbose = 2)
 pred <- predict(bstSparse, as.matrix(result_no_y))
-pred
-val_data$pred <- pred
+
+#val_data$pred <- pred
 #write.csv(val_data,"validation.csv")
 
 result$pred <- pred
-write.csv(result,"result_check.csv")
 
-bartfit <- lbart(x.train = train_no_y,y.train = train_data$y,sparse = TRUE,ndpost = 500,nskip = 2500,keepevery = 5,printevery = 500)
-bart_pred <- predict(bartfit, result_no_y)
+library(BART)
+library(parallel)
+bartfit <- lbart(x.train = train_no_y,y.train = train_data$y)
+bartpred <- predict(bartfit, result_no_y)
+result$bartpred <- bartpred$prob.test.mean
+#write.csv(result,"result_checkbart.csv")
