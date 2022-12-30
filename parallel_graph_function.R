@@ -8,6 +8,21 @@ my.cluster <- parallel::makeCluster(
   type = "PSOCK"
 )
 doParallel::registerDoParallel(cl = my.cluster)
+players <-read.csv("players.csv")
+#add qb name to df
+just_qbs <- just_action_tracking %>% left_join(players %>% select(nflId,displayName)) %>% filter(pff_role == "Pass") 
+just_qbs$displayName <- as.factor(just_qbs$displayName)
+#get bottom qbs by time
+small_qbs <- just_qbs %>% 
+  group_by(displayName) %>%
+  summarise(n = n()) %>% filter(n <1000) %>% select(displayName)
+smallies <- unlist(lapply(small_qbs, as.character))
+
+all_qbs <- levels(just_qbs$displayName)
+all_qbs[all_qbs %in% smallies] <- "rep_level_qb"
+levels(just_qbs$displayName) <- all_qbs
+
+just_names <- just_qbs %>% select(c(comb_and_frame, displayName)) %>% distinct
 
 graph_processing_function <- function(data){
   data$comb_and_frame <- droplevels(data$comb_and_frame)
@@ -34,13 +49,15 @@ graph_processing_function <- function(data){
   
   #filter results to get response variable (y)
   df_this_play <- df_in_play %>% filter(comb_id == df$comb_id[1])
-  group_by_pressure <- ifelse(df$frameId >=(df_this_play$play_over[1]-20),abs(df$frameId -df_this_play$play_over[1]),0)
+  group_by_pressure <- ifelse(df$comb_and_frame %in% just_sack_frame,1,0)
+  to_loop <- merge(to_loop, just_names, on= "comb_and_frame")
   
   
   #get node features(graph.x)
   #get for every play (2 node features)
-  features <- to_loop %>%  dplyr::select(x,c("s","node_type_Pass","node_type_Pass Block","node_type_Pass Rush","frameId", "quarter", "down","yardsToGo", "row"))
-  
+  features <- to_loop %>%  dplyr::select(x,c("s","node_type_Pass","node_type_Pass Block","node_type_Pass Rush","frameId", "quarter", "down","yardsToGo", "row","displayName"))
+  features <- dummy_cols(features, 
+                        select_columns = c("displayName"), remove_selected_columns = TRUE)
   #loop to get distances between all points (adjacency matrix) (graph.a)
   dist_subset <- to_loop %>% select(-row) %>% 
     distinct %>% 

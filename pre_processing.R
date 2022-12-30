@@ -81,14 +81,14 @@ just_action_tracking$comb_and_frame <- as.factor(just_action_tracking$comb_and_f
 
 
 #train val split and 1 0 split
-just_sack_frame <- just_action_tracking %>% filter(event == "qb_sack"|event == "qb_strip_sack") %>% select(c(comb_id,frameId)) %>% distinct
+just_sack_frame <- just_action_tracking %>% filter(event == "qb_sack"|event == "qb_strip_sack") %>% select(c(comb_and_frame)) %>% distinct
 no_sack_frame <- levels(just_action_tracking$comb_id)[!(levels(just_action_tracking$comb_id) %in% just_sack_frame$comb_id)]
 
 
 #SUBSETTING
 #subset based on play, so we aren't training and validating on the same play
 N<-length(levels(just_action_tracking$comb_id))
-trainset<-sort(sample(1:N,size=floor(N*0.80)))
+trainset<-sort(sample(1:N,size=floor(N*0.10)))
 validset<-setdiff(1:N,trainset)
 
 
@@ -113,6 +113,8 @@ train_val_subset_function <- function(subset){
   chosen_frames$pff_role <- as.factor(chosen_frames$pff_role)
   return(chosen_frames)
 }
-
+train_subset <- train_val_subset_function(trainset)
+val_data <- just_action_tracking %>% filter(comb_id %in% levels(just_action_tracking$comb_id)[validset])
+train_data  <- just_action_tracking %>% filter(comb_id %in% levels(just_action_tracking$comb_id)[trainset])
 
 

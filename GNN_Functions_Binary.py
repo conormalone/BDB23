@@ -37,16 +37,16 @@ class GraphDataset(Dataset):
         output = []
         for i in range(self.n_samples):
             # Node features
-            iter_x = self.df["train_x"][i].copy()
+            iter_x = self.df[i]["train_x"].copy()
             #print(iter_x)
             x = np.array(iter_x)#.reshape(iter_x.shape)
 
             # Edges
-            iter_a =  self.df["train_a"][i].copy()
+            iter_a =  self.df[i]["train_a"].copy()
             the_length = len(iter_a)
             a = np.array(iter_a).reshape(the_length,the_length)
-            #
-            y = int(self.df["y"][i])
+            #print(iter_a)
+            y = int(self.df[i]["y"])
             
            
             output.append(Graph(x=x, a=a, y=y))
@@ -56,10 +56,12 @@ class GraphDataset(Dataset):
 
  #
 # Train/valid/test split
-len_train = len(local_train["train_x"])
-len_val = len(local_val["train_x"])
+len_train = len(local_train)
+print(len_train)
+len_val = len(local_val)
 #len_test = len(local_test["train_x"])
-len_all = len(local_all["train_x"])
+len_all = len(local_all)
+print(len_all)
 data_tr = GraphDataset(n_samples = len_train, df = local_train, transforms=NormalizeAdj())
 data_va = GraphDataset(n_samples = len_val, df = local_val, transforms=NormalizeAdj())
 #data_te = GraphDataset(n_samples = len_test, df=local_test, transforms=NormalizeAdj())
