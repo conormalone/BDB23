@@ -89,7 +89,7 @@ library(foreach)
 library(doParallel)
 library(tidyverse)
 my.cluster <- parallel::makeCluster(
-  11, 
+  parallel::detectCores(), 
   type = "PSOCK"
 )
 
@@ -155,6 +155,8 @@ result <- rbind(result, iteration)
 library(tidyverse)
 result <- read.csv("result.csv")
 result <- result %>% select(-X)
+to_add <- just_action_tracking %>% filter(pff_role == "Pass") %>% distinct(comb_and_frame, .keep_all = TRUE) %>% select(c(s,a,dis,o,dir)) 
+ result <- cbind(result,to_add)
 just_sack_frame <- just_action_tracking %>% filter(event == "qb_sack"|event == "qb_strip_sack") %>% select(c(comb_id,frameId)) %>% unite("comb_and_frame", c(comb_id,frameId), sep= " ",remove = FALSE) %>% 
   mutate(comb_and_frame = as.factor(comb_and_frame))%>% distinct
 
@@ -171,7 +173,7 @@ result <- dummy_cols(result,
 
 just_action_tracking$comb_id <- as.factor(just_action_tracking$comb_id)
 N<-length(levels(just_action_tracking$comb_id))
-trainset<-sort(sample(1:N,size=floor(N*0.80)))
+trainset<-sort(sample(1:N,size=floor(N*0.70)))
 validset<-setdiff(1:N,trainset)
 train_data <- result %>% filter(comb_id %in% levels(just_action_tracking$comb_id)[trainset]) %>% select(-c(comb_and_frame,comb_id))
 val_data <- result %>% filter(comb_id %in% levels(just_action_tracking$comb_id)[validset])%>% select(-c(comb_and_frame,comb_id))
@@ -182,17 +184,17 @@ library(xgboost)
 train_no_y <- train_data %>% select(-y)
 val_no_y <- val_data %>% select(-y)
 result_no_y <- result %>% select(-c(y, comb_and_frame,comb_id))
-bstSparse <-xgboost(data = as.matrix(train_no_y), label = train_data$y, max.depth = 10, nrounds = 10, objective = "binary:logistic", verbose = 2)
+bstSparse <-xgboost(data = as.matrix(train_no_y), label = train_data$y, max.depth = 10, eta = .1,nrounds = 20, objective = "binary:logistic", verbose = 2)
 pred <- predict(bstSparse, as.matrix(result_no_y))
 
-#val_data$pred <- pred
-#write.csv(val_data,"validation.csv")
+val_data$pred <- pred
+write.csv(val_data,"validation.csv")
 
-result$pred <- pred
+result$pred2 <- pred
 
 library(BART)
 library(parallel)
 bartfit <- lbart(x.train = train_no_y,y.train = train_data$y)
 bartpred <- predict(bartfit, result_no_y)
 result$bartpred <- bartpred$prob.test.mean
-#write.csv(result,"result_checkbart.csv")
+#write.csv(result,"result_checkbart2.csv")
