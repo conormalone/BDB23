@@ -21,7 +21,7 @@ batch_size = 21  # Batch size
 l1_reg = 5e-3
 n_out = 1
 #local_all = r.all_data
-local_test = r.testing_data
+#local_test = r.testing_data
 local_train = r.training_data
 local_val = r.validation_data
 local_all = r.all_data
@@ -61,17 +61,17 @@ class GraphDataset(Dataset):
 # Train/valid/test split
 len_train = len(local_train["train_x"])
 len_val = len(local_val["train_x"])
-len_test = len(local_test["train_x"])
+#len_test = len(local_test["train_x"])
 len_all = len(local_all["train_x"])
 data_tr = GraphDataset(n_samples = len_train, df = local_train, transforms=NormalizeAdj())
 data_va = GraphDataset(n_samples = len_val, df = local_val, transforms=NormalizeAdj())
-data_te = GraphDataset(n_samples = len_test, df=local_test, transforms=NormalizeAdj())
+#data_te = GraphDataset(n_samples = len_test, df=local_test, transforms=NormalizeAdj())
 data_all = GraphDataset(n_samples = len_all, df=local_all, transforms=NormalizeAdj())
 
 # Data loaders
 loader_tr = BatchLoader(data_tr, batch_size=batch_size, epochs=epochs, mask=True)
 loader_va = BatchLoader(data_va, batch_size=batch_size, mask=True)
-loader_te = BatchLoader(data_te, batch_size=batch_size, mask=True)
+#loader_te = BatchLoader(data_te, batch_size=batch_size, mask=True)
 loader_all = BatchLoader(data_all, batch_size=batch_size, mask=True)
 
 
@@ -106,8 +106,8 @@ model.compile('adam', "binary_crossentropy","binary_accuracy")
 model.fit(loader_tr.load(), validation_data= loader_va.load(), steps_per_epoch=loader_tr.steps_per_epoch,
     validation_steps=loader_va.steps_per_epoch, epochs=100)
 
-test_loss = model.evaluate(loader_te.load(), steps=loader_te.steps_per_epoch)
+#test_loss = model.evaluate(loader_te.load(), steps=loader_te.steps_per_epoch)
 
-print('Test loss: {}'.format(test_loss))
+#print('Test loss: {}'.format(test_loss))
 
 predictions = model.predict(loader_all.load(), steps =loader_all.steps_per_epoch)

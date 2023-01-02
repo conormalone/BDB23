@@ -180,7 +180,7 @@ just_sack_frame$comb_and_frame <- as.factor(just_sack_frame$comb_and_frame)
 ####graph function from 2022
 library(mltools)
 library(data.table)
-graph_processing_function <- function(data, end = 0){
+graph_processing_function <- function(data){
   features <- list()
   adj_matrix <- list()
   y_list <-list()
@@ -215,16 +215,10 @@ graph_processing_function <- function(data, end = 0){
     to_loop <-one_hot(data.table(to_loop),cols = c("node_type"))
     
     
-    
-    #get y values
-    if(end ==1){
-      group_by_pressure <- ifelse(df$comb_id %in% just_sack_frame$comb_id,1,0)
-      #group_by_pressure <- df %>% select(c(pff_hit,pff_hurry,pff_sack)) %>% mutate_all(~replace(., is.na(.), 0)) %>% summarise(pressures = max(pff_hit,pff_hurry,pff_sack))
-    }
-    else{
+   
       df_this_play <- df_in_play %>% filter(comb_id == df$comb_id[1])
-      group_by_pressure <- ifelse(df$frameId >=(df_this_play$play_over[1]-15),1,0)
-    }
+      group_by_pressure <- ifelse(df$frameId >=(df_this_play$play_over[1]-20),abs(df$frameId -df_this_play$play_over[1]),0)
+    
     
     #get node features(graph.x)
     #get for every play (2 node features)
@@ -246,34 +240,47 @@ graph_processing_function <- function(data, end = 0){
   return(function_graph_list)
 } 
 #use function on start (all) and end data
-training_data_start <- graph_processing_function(train_data_start,0)
-validation_data_start <- graph_processing_function(val_data_start,0)
-training_data_end <- graph_processing_function(train_data,1)
-validation_data_end <- graph_processing_function(val_data,1)
+training_data<- graph_processing_function(train_data)
+validation_data <- graph_processing_function(val_data)
 
 all_data <- graph_processing_function(just_action_tracking)
 
 
 library(reticulate)
-source_python("GNN_Functionsv3.py")
-start_predictions <- py$predictions_start
-end_predictions <- py$predictions_end
-#all_predictions <- py$predictions
-mean(start_predictions)
-#leave out last level, it took 2 days to run, not doing it again
-#just_action_tracking <- just_action_tracking %>% filter(comb_and_frame != "2021110100 917 9")
-#just_action_tracking$comb_and_frame <- droplevels(just_action_tracking$comb_and_frame)
-#
+source_python("GNN_Functions_cat.py")
+
+all_predictions <- py$predictions
+
+training_data_backup <-training_data
+validation_data_backup <- validation_data
+training_data <-training_data_backup
+validation_data <- validation_data_backup
+
+
+all_eval <- data.frame(matrix(ncol = 0, nrow = 0))
+
+for(i in 1:nrow(all_predictions)){
+  comb_and_frame <- levels(just_action_tracking$comb_and_frame)[i]
+  predict <- max(which(all_predictions[i,] > 0.5))
+  actual <-all_data$y[i][[1]]
+  difference <- actual - predict
+  all_eval <- rbind(all_eval, c(comb_and_frame, predict,actual, difference))
+}
+colnames(all_eval) <- c("comb_and_frame",  "predict","actual", "difference")
+write.csv(just_action_tracking, "last_action.csv")
+all_eval$comb_and_frame <- as.factor(all_eval$comb_and_frame)
+just_action_tracking <- merge(just_action_tracking, all_eval, on = comb_and_frame)
+just_action_tracking$pred <- all_eval$predict
+
+just_action_tracking$actual<- all_eval$actual
 
 #length(levels(just_action_tracking$comb_and_frame))
 merged_predictions <- cbind(levels(just_action_tracking$comb_and_frame),as.numeric(start_predictions),as.numeric(end_predictions))
 colnames(merged_predictions) <- c("comb_and_frame","start_predictions","end_predictions")
 new_df <- merge(just_action_tracking,merged_predictions, on= "comb_and_frame")
-new_df$end_predictions <-as.numeric(new_df$end_predictions)
-new_df$start_predictions <-as.numeric(new_df$start_predictions)
-new_df$combined_predictions <- new_df$start_predictions *new_df$end_predictions
+
 write.csv(new_df, "new_df15.csv")
-level_chk <-new_df %>% group_by(comb_id) %>% select(c("comb_id","combined_predictions")) %>% 
-  summarise(max_rate= max(combined_predictions), min_rate = min(combined_predictions), diff = max_rate-min_rate) %>% 
+level_chk <-just_action_tracking %>% group_by(comb_id) %>% select(c("comb_id","predictions")) %>% 
+  summarise(max_rate= max(predict), min_rate = min(predict), diff = max_rate-min_rate) %>% 
   arrange(desc(diff))
 just_action_tracking$pred <- new_df$combined_predictions

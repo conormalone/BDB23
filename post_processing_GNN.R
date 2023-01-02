@@ -24,7 +24,7 @@ all_predictions <- py$predictions
 merged_predictions <- cbind(levels(just_action_tracking$comb_and_frame),as.numeric(all_predictions))
 colnames(merged_predictions) <- c("comb_and_frame","predictions")
 new_df <- merge(just_action_tracking,merged_predictions, on= "comb_and_frame")
-
+new_df <- new_df %>% filter(pff_role == "Pass")
 write.csv(new_df, "new_df.csv")
 training_data[1]
 training_data[230006]
