@@ -67,4 +67,16 @@ graph_processing_function <- function(data){
   function_graph_list <-list( train_x = features, train_a = adj_matrix, y = group_by_pressure[1])
   return(function_graph_list)
 }
+answer_list <- list()
 
+for(i in 1:length(all_data)){
+  if(all_data[[i]]$train_x[2,"node_type_Pass Rush"]==1)
+    answer_list <- append(answer_list, 1)
+  else if(all_data[[i]]$train_x[3,"node_type_Pass Rush"]==1 & all_data[[i]]$train_a[3,1]<2)
+
+  answer_list <- append(answer_list, 1)
+  else answer_list <- append(answer_list, 0)
+}
+for(i in 1:length(all_data)){
+  all_data[[i]]$y <- answer_list[[i]]
+}

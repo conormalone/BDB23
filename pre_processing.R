@@ -88,7 +88,7 @@ no_sack_frame <- levels(just_action_tracking$comb_id)[!(levels(just_action_track
 #SUBSETTING
 #subset based on play, so we aren't training and validating on the same play
 N<-length(levels(just_action_tracking$comb_id))
-trainset<-sort(sample(1:N,size=floor(N*0.10)))
+trainset<-sort(sample(1:N,size=floor(N*0.80)))
 validset<-setdiff(1:N,trainset)
 
 
