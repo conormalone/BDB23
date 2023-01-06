@@ -81,3 +81,39 @@ ggplot(pressure_time, aes(time_avg, pressure_avg))+
   geom_image(aes(image=team_logo_espn), size=.08)+
   geom_smooth(method ="lm", se = FALSE)+theme_classic()+
   xlab("Average Play Count, Pass Blockers")+ylab("Sack Percentage on High Risk Plays")
+press_table <- pressure_time[2:4]
+
+colnames(press_table) <-c("SackUnderPressure %", "Avg Plays Per OL Man", "Team")
+library(formattable)
+press_table$`SackUnderPressure %` = formattable::percent(press_table$`SackUnderPressure %`, digits = 0) 
+press_table$`Plays Per OL Man` = round(press_table$`Plays Per OL Man`,0)
+press_table <- press_table %>% arrange(`SackUnderPressure %`)
+top_tab <- press_table[1:16,]
+bot_tab <- press_table[16:32,]
+library(kableExtra)
+kable(list(top_tab,bot_tab), caption = "",row.names = T, format = "html", align = "l",table.attr = "style='width:70%;'")%>% 
+  kable_styling(font_size = 8)
+####by game week
+games <-read.csv("games.csv")
+with_weeks <- merge(late_pressure_df, games, on = "gameId")
+weekly <- with_weeks %>%group_by(week, team, comb_id) %>% summarise(sacks = max(sack))%>% 
+                           group_by(week,team) %>% summarise(pressure_avg = mean(sacks))
+ggplot(weekly)+geom_boxplot(aes(week, pressure_avg, group = week))+xlab("Game Week")+ylab("Sack Percentage")+theme_classic()
+#### by quarter
+plays$comb_id <-paste0(as.character(plays$gameId)," ", as.character(plays$playId))
+plays$comb_id <-as.factor(plays$comb_id)
+with_quarters <- merge(late_pressure_df, plays, on = "comb_id")
+quarterly <- with_quarters %>% group_by(quarter, team, comb_id) %>% summarise(sacks = max(sack))%>% 
+  group_by(quarter,team) %>% summarise(pressure_avg = mean(sacks))
+ggplot(quarterly)+geom_boxplot(aes(quarter, pressure_avg, group = quarter))+xlab("Game Quarter")+ylab("Sack Percentage")+theme_classic()
+#model diagnostics
+val_predictions <- all_predictions[levels(just_action_tracking$comb_and_frame) %in% just_c_and_f_val]
+prediction_val <- list()
+for(i in 1:sum(levels(just_action_tracking$comb_and_frame) %in% just_c_and_f_val)){
+  actual <- validation_data[[i]]$y
+  pred <- ifelse(val_predictions[i]>.5,1,0)
+  if(actual == pred){
+    prediction_val <- append(prediction_val, 1)
+  }else{ prediction_val <- append(prediction_val, 0)}
+}
+
